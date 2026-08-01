@@ -8,6 +8,7 @@ locals {
     BQ_COMPUTE_PROJECT_ID     = var.project_id
     BQ_DATA_PROJECT_ID        = local.data_project_id
     BQ_DATASET_ID             = var.dataset_id
+    BQ_MAXIMUM_BYTES_BILLED   = tostring(var.maximum_bytes_billed)
     DATASET_CONFIG_FILE       = "config/datasets/thelook_ecommerce_dataset_config.json"
     ENABLE_BQML               = "false"
     ROOT_AGENT_MODEL          = var.model_name

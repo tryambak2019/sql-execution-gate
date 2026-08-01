@@ -1,5 +1,5 @@
 output "service_url" {
-  description = "Public FSBQ application URL."
+  description = "Public SQL Execution Gate application URL."
   value       = google_cloud_run_v2_service.app.uri
 }
 

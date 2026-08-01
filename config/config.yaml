@@ -1,4 +1,4 @@
 usage_limits:
-  # Substantive natural-language requests allowed per visitor IP and instance.
+  # Substantive natural-language requests allowed per in-memory rate-limit key.
   # SQL approval and cancellation replies ("yes"/"no") are not counted.
   max_user_queries: 50

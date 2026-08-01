@@ -11,7 +11,7 @@ steps:
       - --target
       - frontend-test
       - --tag
-      - fsbq-frontend-test:$BUILD_ID
+      - sql-execution-gate-frontend-test:$BUILD_ID
       - .
 
   - id: backend-checks
@@ -21,7 +21,7 @@ steps:
       - --target
       - backend-test
       - --tag
-      - fsbq-backend-test:$BUILD_ID
+      - sql-execution-gate-backend-test:$BUILD_ID
       - .
 
   - id: build

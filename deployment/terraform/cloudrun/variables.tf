@@ -1,5 +1,5 @@
 variable "project_id" {
-  description = "Google Cloud project that hosts FSBQ."
+  description = "Google Cloud project that hosts SQL Execution Gate."
   type        = string
 }
 
@@ -39,8 +39,19 @@ variable "dataset_id" {
   default     = "thelook_ecommerce"
 }
 
+variable "maximum_bytes_billed" {
+  description = "Maximum bytes a single approved BigQuery query may bill."
+  type        = number
+  default     = 1000000000
+
+  validation {
+    condition     = var.maximum_bytes_billed >= 10000000
+    error_message = "maximum_bytes_billed must be at least 10 MB."
+  }
+}
+
 variable "model_name" {
-  description = "Vertex AI model used by FSBQ agents other than SQL planning."
+  description = "Vertex AI model used by SQL Execution Gate agents other than SQL planning."
   type        = string
   default     = "gemini-2.5-flash"
 }

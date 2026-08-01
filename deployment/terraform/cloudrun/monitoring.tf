@@ -2,7 +2,7 @@ resource "google_monitoring_notification_channel" "engagement_email" {
   count = var.engagement_alert_email == "" ? 0 : 1
 
   project      = var.project_id
-  display_name = "FSBQ demo engagement email"
+  display_name = "SQL Execution Gate demo engagement email"
   type         = "email"
   labels = {
     email_address = var.engagement_alert_email
@@ -15,7 +15,7 @@ resource "google_monitoring_alert_policy" "demo_engagement" {
   count = var.engagement_alert_email == "" ? 0 : 1
 
   project      = var.project_id
-  display_name = "FSBQ demo page visited"
+  display_name = "SQL Execution Gate demo page visited"
   combiner     = "OR"
 
   conditions {
@@ -41,7 +41,7 @@ resource "google_monitoring_alert_policy" "demo_engagement" {
   ]
 
   documentation {
-    content = "The FSBQ demo page was requested. During development this can include the owner, refreshes, bots, scanners, link previews, and deployment smoke tests. Inspect the structured Cloud Run log for timestamp, IP address, and user agent."
+    content = "The SQL Execution Gate demo page was requested. Inspect the associated structured Cloud Run log."
   }
 
   depends_on = [google_project_service.required["logging.googleapis.com"]]

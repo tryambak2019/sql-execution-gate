@@ -12,5 +12,5 @@ create_artifact_repository = false
 # Google sends a one-time verification message before alerts are delivered.
 engagement_alert_email = "dev.ocicloud26@yahoo.com"
 
-# Optional: add this after connecting fsbq-agent in Cloud Build repositories.
-# cloud_build_repository = "projects/gcplab20250706/locations/us-central1/connections/CONNECTION/repositories/fsbq-agent"
+# Optional: add this after connecting the repository in Cloud Build.
+# cloud_build_repository = "projects/gcplab20250706/locations/us-central1/connections/CONNECTION/repositories/sql-execution-gate"

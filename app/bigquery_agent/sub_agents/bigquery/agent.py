@@ -26,6 +26,7 @@ from google.adk.tools.bigquery.config import BigQueryToolConfig, WriteMode
 from google.genai import types
 
 from ....utils.utils import USER_AGENT, get_env_var
+from ...sql_gate import SqlGateBlocked, dry_run_sql, get_maximum_bytes_billed
 from . import tools
 from .chase_sql import chase_db_tools
 from .prompts import return_instructions_bigquery
@@ -158,8 +159,24 @@ def enforce_compute_project(
     args: dict[str, Any],
     tool_context: ToolContext,
 ) -> dict | None:
-    """Force BigQuery jobs to run in the configured billing project."""
+    """Revalidate approved SQL and force the configured billing project."""
     if tool.name == ADK_BUILTIN_BQ_EXECUTE_SQL_TOOL:
+        try:
+            review = dry_run_sql(args.get("query", ""))
+        except Exception as exc:
+            reason = str(exc) or "Query preflight failed."
+            tool_context.state["sql_execution_blocked"] = True
+            tool_context.state["sql_execution_blocked_reason"] = reason
+            return {
+                "status": "ERROR",
+                "error": f"Blocked: {reason} No BigQuery query job was submitted.",
+            }
+        tool_context.state["sql_review"] = {
+            "sql_fingerprint": review.sql_fingerprint,
+            "referenced_tables": list(review.referenced_tables),
+            "estimated_bytes": review.estimated_bytes,
+            "maximum_bytes_billed": review.maximum_bytes_billed,
+        }
         args["project_id"] = get_env_var("BQ_COMPUTE_PROJECT_ID")
     return None
 
@@ -172,6 +189,7 @@ bigquery_tool_config = BigQueryToolConfig(
     application_name=USER_AGENT,
     compute_project_id=get_env_var("BQ_COMPUTE_PROJECT_ID"),  # Billing project
     location=os.getenv("BQ_LOCATION") or None,
+    maximum_bytes_billed=get_maximum_bytes_billed(),
 )
 
 # Create BigQueryToolset - only accepts tool_filter and bigquery_tool_config

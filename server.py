@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import yaml
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -23,6 +23,11 @@ from app.bigquery_agent.sub_agents.analytics.visualization_agent import (
 )
 from app.bigquery_agent.sub_agents.bigquery.tools import (
     get_bigquery_schema_and_samples,
+)
+from app.bigquery_agent.sql_gate import (
+    SqlGateBlocked,
+    dry_run_sql,
+    write_intent_block_reason,
 )
 from app.bigquery_agent.visualization import extract_vega_lite_specs
 
@@ -46,20 +51,25 @@ def _load_max_user_queries(config_path: Path) -> int:
 
 def _is_counted_user_query(payload: object) -> bool:
     """Count substantive chat requests, but not HITL approval/cancellation turns."""
+    text = _user_message_text(payload)
+    return bool(text) and text.casefold() not in {"yes", "no"}
+
+
+def _user_message_text(payload: object) -> str:
+    """Extract one user turn from the ADK request envelope."""
     if not isinstance(payload, dict):
-        return False
+        return ""
     new_message = payload.get("newMessage")
     if not isinstance(new_message, dict) or new_message.get("role") != "user":
-        return False
+        return ""
     parts = new_message.get("parts")
     if not isinstance(parts, list):
-        return False
-    text = "".join(
+        return ""
+    return "".join(
         part.get("text", "")
         for part in parts
         if isinstance(part, dict) and isinstance(part.get("text"), str)
     ).strip()
-    return bool(text) and text.casefold() not in {"yes", "no"}
 
 
 class VisualizationRequest(BaseModel):
@@ -68,6 +78,12 @@ class VisualizationRequest(BaseModel):
     app_name: str = Field(min_length=1, max_length=100)
     user_id: str = Field(min_length=1, max_length=200)
     session_id: str = Field(min_length=1, max_length=200)
+
+
+class SqlPreflightRequest(BaseModel):
+    """Generated SQL requiring deterministic review evidence."""
+
+    sql: str = Field(min_length=1, max_length=100_000)
 
 
 def _client_ip(request: Request) -> str:
@@ -86,7 +102,7 @@ def create_app(
     dist = frontend_dist or DEFAULT_FRONTEND_DIST
     max_user_queries = _load_max_user_queries(config_path or DEFAULT_CONFIG_PATH)
     query_counts: defaultdict[str, int] = defaultdict(int)
-    agents_dir = Path(os.getenv("FSBQ_AGENTS_DIR", str(PROJECT_ROOT)))
+    agents_dir = Path(os.getenv("SQL_EXECUTION_GATE_AGENTS_DIR", str(PROJECT_ROOT)))
     adk_app = get_fast_api_app(
         agents_dir=str(agents_dir),
         allow_origins=[],
@@ -117,6 +133,25 @@ def create_app(
                 payload = json.loads(await request.body())
             except (json.JSONDecodeError, UnicodeDecodeError):
                 payload = None
+            block_reason = write_intent_block_reason(_user_message_text(payload))
+            if block_reason:
+                event = {
+                    "author": "sql_execution_gate",
+                    "content": {
+                        "parts": [
+                            {
+                                "text": (
+                                    f"Blocked: {block_reason}\n\n"
+                                    "No BigQuery query job was submitted."
+                                )
+                            }
+                        ]
+                    },
+                }
+                return StreamingResponse(
+                    iter([f"data: {json.dumps(event)}\n\n"]),
+                    media_type="text/event-stream",
+                )
             if _is_counted_user_query(payload):
                 visitor = _client_ip(request)
                 if query_counts[visitor] >= max_user_queries:
@@ -141,6 +176,26 @@ def create_app(
     @app.get("/healthz", include_in_schema=False)
     async def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.post("/sql/preflight", include_in_schema=False)
+    async def sql_preflight(payload: SqlPreflightRequest) -> dict[str, object]:
+        """Return read-only policy evidence before approval is enabled."""
+        try:
+            review = dry_run_sql(payload.sql)
+        except SqlGateBlocked as exc:
+            raise HTTPException(status_code=422, detail=f"Blocked: {exc}") from exc
+        except Exception as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="BigQuery dry run could not be completed.",
+            ) from exc
+        return {
+            "status": "ready_for_approval",
+            "sql_fingerprint": review.sql_fingerprint,
+            "referenced_tables": list(review.referenced_tables),
+            "estimated_bytes": review.estimated_bytes,
+            "maximum_bytes_billed": review.maximum_bytes_billed,
+        }
 
     @app.post("/visualize", include_in_schema=False)
     async def visualize(payload: VisualizationRequest) -> dict[str, object]:
@@ -174,11 +229,11 @@ BigQuery result. Return a short insight followed by exactly one fenced
 """
         sessions = InMemorySessionService()
         chart_session = await sessions.create_session(
-            app_name="fsbq_visualization",
+            app_name="sql_execution_gate_visualization",
             user_id=payload.user_id,
         )
         runner = Runner(
-            app_name="fsbq_visualization",
+            app_name="sql_execution_gate_visualization",
             agent=visualization_agent,
             session_service=sessions,
         )

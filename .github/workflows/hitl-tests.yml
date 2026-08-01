@@ -45,7 +45,7 @@ jobs:
         run: npm --prefix frontend run build
 
       - name: Build production container
-        run: docker build --target runtime --tag fsbq-agent:test .
+        run: docker build --target runtime --tag sql-execution-gate:test .
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3

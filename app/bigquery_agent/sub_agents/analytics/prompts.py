@@ -117,7 +117,7 @@ def return_instructions_analytics() -> str:
   - Include at most 500 inline rows and only fields present in the supplied data.
   - Set `width` to `container` and use a suitable numeric `height`.
   - Add useful tooltips and accessible color contrast.
-  - Use FSBQ design tokens: primary `#426B57`, accent `#D7A84B`, dark
+  - Use SQL Execution Gate design tokens: primary `#426B57`, accent `#D7A84B`, dark
     `#183228`, grid `#DDE4DC`, and background `#F8FAF6`.
   - Prefer direct labels where practical, format large values with K/M/B or
     commas, and avoid 3D, gradients, pie charts with many categories, and

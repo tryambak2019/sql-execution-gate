@@ -56,17 +56,18 @@ def test_prompt_defaults_to_vega_and_allowlists_executor_reasons() -> None:
     assert "Visual complexity alone is NOT a reason" in prompt
 
 
-def test_root_prompt_preserves_direct_plot_request_after_sql_approval() -> None:
-    """A typed plot request remains mandatory after the HITL approval turn."""
+def test_root_prompt_delegates_visualization_to_application() -> None:
+    """The query agent cannot turn conversational context into chart authority."""
 
     class PromptContext:
         state = {}
 
     prompt = get_instruction_with_schema(PromptContext())
+    normalized_prompt = " ".join(prompt.lower().split())
 
-    assert "persistent visualization requirement" in prompt
-    assert "MUST call `call_analytics_agent`" in prompt
-    assert "Return the Vega-Lite block" in prompt
+    assert "application owns visualization" in prompt
+    assert "call_analytics_agent" not in prompt
+    assert "do not generate or request a chart" in normalized_prompt
 
 
 def test_executor_reason_gate_is_fail_closed() -> None:

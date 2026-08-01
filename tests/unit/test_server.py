@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from fastapi.testclient import TestClient
 from pytest import CaptureFixture, MonkeyPatch
 
+from app.bigquery_agent.sql_gate import SqlReview
 from server import create_app
 
 
@@ -14,7 +15,7 @@ def _built_frontend(tmp_path: Path) -> Path:
     dist = tmp_path / "dist"
     dist.mkdir()
     (dist / "index.html").write_text(
-        "<!doctype html><title>FSBQ Agent</title>",
+        "<!doctype html><title>SQL Execution Gate</title>",
         encoding="utf-8",
     )
     return dist
@@ -47,7 +48,7 @@ def test_health_and_frontend_are_served(tmp_path: Path) -> None:
     assert health.status_code == 200
     assert health.json() == {"status": "ok"}
     assert frontend.status_code == 200
-    assert "FSBQ Agent" in frontend.text
+    assert "SQL Execution Gate" in frontend.text
 
 
 def test_selected_table_schema_returns_only_requested_table(
@@ -188,13 +189,71 @@ def test_runtime_agents_directory_does_not_expose_repo_folders(
 ) -> None:
     agents_dir = tmp_path / "agents"
     (agents_dir / "app").mkdir(parents=True)
-    monkeypatch.setenv("FSBQ_AGENTS_DIR", str(agents_dir))
+    monkeypatch.setenv("SQL_EXECUTION_GATE_AGENTS_DIR", str(agents_dir))
     client = TestClient(create_app(_built_frontend(tmp_path)))
 
     response = client.get("/api/list-apps")
 
     assert response.status_code == 200
     assert response.json() == ["app"]
+
+
+def test_sql_preflight_returns_review_evidence(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "server.dry_run_sql",
+        lambda _sql: SqlReview(
+            sql_fingerprint="abc123",
+            referenced_tables=("`project.dataset.orders`",),
+            estimated_bytes=640,
+            maximum_bytes_billed=1000,
+        ),
+    )
+    client = TestClient(create_app(_built_frontend(tmp_path)))
+
+    response = client.post("/sql/preflight", json={"sql": "SELECT 1"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ready_for_approval",
+        "sql_fingerprint": "abc123",
+        "referenced_tables": ["`project.dataset.orders`"],
+        "estimated_bytes": 640,
+        "maximum_bytes_billed": 1000,
+    }
+
+
+def test_explicit_write_request_is_blocked_before_agent_execution(
+    tmp_path: Path,
+) -> None:
+    client = TestClient(create_app(_built_frontend(tmp_path)))
+
+    response = client.post(
+        "/api/run_sse",
+        json={
+            "appName": "app",
+            "userId": "demo-user",
+            "sessionId": "blocked-session",
+            "newMessage": {
+                "role": "user",
+                "parts": [
+                    {
+                        "text": (
+                            "Delete all cancelled orders and return the "
+                            "remaining revenue."
+                        )
+                    }
+                ],
+            },
+            "streaming": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "Blocked: SQL Execution Gate permits read-only queries only." in response.text
+    assert "No BigQuery query job was submitted." in response.text
 
 
 def test_demo_visit_emits_structured_log(

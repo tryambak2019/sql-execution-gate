@@ -6,6 +6,7 @@ import type { VisualizationSpec } from "vega-embed";
 type Role = "user" | "assistant";
 type ApprovalStatus = "pending" | "approved" | "rejected";
 type RequestStage = "idle" | "starting" | "working" | "streaming";
+type OutputMode = "analysis" | "visualize";
 
 interface Message {
   id: string;
@@ -13,6 +14,7 @@ interface Message {
   content: string;
   agent?: string;
   approvalStatus?: ApprovalStatus;
+  visualizeAfterApproval?: boolean;
   images?: MessageImage[];
 }
 
@@ -48,7 +50,7 @@ interface AdkEvent {
 }
 
 const APP_NAME = "app";
-const USER_ID = "fsbq-demo-user";
+const USER_ID = "sql-execution-gate-demo-user";
 const SQL_BLOCK = /```sql\s*([\s\S]*?)```/i;
 const VEGA_LITE_BLOCK = /```vega-lite\s*([\s\S]*?)```/gi;
 
@@ -71,8 +73,23 @@ interface TableSchema {
   }>;
 }
 
+interface SqlReview {
+  status: "ready_for_approval";
+  sql_fingerprint: string;
+  referenced_tables: string[];
+  estimated_bytes: number;
+  maximum_bytes_billed: number;
+}
+
 function makeId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1000)), units.length - 1);
+  return `${(bytes / 1000 ** index).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
 function mergeEventText(current: string, incoming: string): string {
@@ -271,6 +288,68 @@ function canPlotMessage(message: Message): boolean {
   );
 }
 
+function suggestFollowUpQuestions(context: string): string[] {
+  const normalized = context.toLowerCase();
+
+  if (/revenue|sales|price|spend/.test(normalized)) {
+    return [
+      "Break this revenue down by product category.",
+      "How has this revenue changed month over month?",
+      "Which countries contributed the most to this revenue?",
+    ];
+  }
+  if (/cancel|complete|status|order/.test(normalized)) {
+    return [
+      "Show the monthly trend for these order statuses.",
+      "Which product categories have the highest cancellation rate?",
+      "Compare average order value across order statuses.",
+    ];
+  }
+  if (/product|category|brand|item/.test(normalized)) {
+    return [
+      "Compare these products by units sold and revenue.",
+      "How has demand for the leading categories changed over time?",
+      "Which customer countries buy these products most often?",
+    ];
+  }
+  if (/user|customer|country|traffic|source/.test(normalized)) {
+    return [
+      "Compare customer count and revenue by country.",
+      "Which traffic sources produce the highest average order value?",
+      "How has customer acquisition changed month over month?",
+    ];
+  }
+  return [
+    "Show how this result changes month over month.",
+    "Break this result down by product category.",
+    "Compare this result across customer countries.",
+  ];
+}
+
+function explicitlyRequestsVisualization(text: string): boolean {
+  const normalized = text.toLowerCase().replace(/\s+/g, " ").trim();
+  if (
+    /\b(?:do not|don't|dont|without|no need to|avoid|rather than)\b.{0,50}\b(?:plot|chart|graph|visuali[sz])/.test(
+      normalized,
+    ) ||
+    /\bnot\b.{0,25}\b(?:plot|chart|graph|visuali[sz])/.test(
+      normalized,
+    )
+  ) {
+    return false;
+  }
+
+  return (
+    /(?:^|\b(?:please|and|then|also|can you|could you|would you)\s+)(?:plot|chart|graph|visuali[sz]e)\b/.test(
+      normalized,
+    ) ||
+    /\b(?:show|display|render|create|generate|draw|make)\b.{0,40}\b(?:plot|chart|graph|visuali[sz]ation)\b/.test(
+      normalized,
+    ) ||
+    /\bas\s+(?:a\s+)?(?:plot|chart|graph|visuali[sz]ation)\b/.test(normalized)
+  );
+}
+
 async function loadArtifactImage(
   activeSession: Session,
   filename: string,
@@ -367,9 +446,54 @@ function ApprovalCard({
 }: {
   message: Message;
   disabled: boolean;
-  onDecision: (messageId: string, decision: "yes" | "no") => void;
+  onDecision: (
+    messageId: string,
+    decision: "yes" | "no",
+    visualizeAfterApproval: boolean,
+  ) => void;
 }) {
   const sql = message.content.match(SQL_BLOCK)?.[1]?.trim();
+  const [review, setReview] = useState<SqlReview | null>(null);
+  const [reviewState, setReviewState] = useState<
+    "loading" | "ready" | "blocked"
+  >("loading");
+  const [reviewError, setReviewError] = useState("");
+
+  useEffect(() => {
+    if (!sql || message.approvalStatus !== "pending") return;
+    const controller = new AbortController();
+    setReview(null);
+    setReviewState("loading");
+    setReviewError("");
+    fetch("/sql/preflight", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sql }),
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const problem = (await response.json().catch(() => ({}))) as {
+            detail?: string;
+          };
+          throw new Error(problem.detail ?? "Query preflight failed.");
+        }
+        return (await response.json()) as SqlReview;
+      })
+      .then((payload) => {
+        setReview(payload);
+        setReviewState("ready");
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setReviewError(
+          error instanceof Error ? error.message : "Query preflight failed.",
+        );
+        setReviewState("blocked");
+      });
+    return () => controller.abort();
+  }, [message.approvalStatus, sql]);
+
   if (!sql || !message.approvalStatus) return null;
 
   if (message.approvalStatus !== "pending") {
@@ -394,24 +518,55 @@ function ApprovalCard({
       <pre>
         <code>{sql}</code>
       </pre>
+      <div className={`preflight-panel ${reviewState}`} aria-live="polite">
+        {reviewState === "loading" && <strong>Running BigQuery dry run...</strong>}
+        {reviewState === "blocked" && (
+          <>
+            <strong>Approval blocked</strong>
+            <span>{reviewError}</span>
+          </>
+        )}
+        {review && (
+          <>
+            <div>
+              <span>Estimated scan</span>
+              <strong>{formatBytes(review.estimated_bytes)}</strong>
+            </div>
+            <div>
+              <span>Enforced ceiling</span>
+              <strong>{formatBytes(review.maximum_bytes_billed)}</strong>
+            </div>
+            <div className="referenced-tables">
+              <span>Referenced tables</span>
+              {review.referenced_tables.length > 0 ? (
+                review.referenced_tables.map((table) => <code key={table}>{table}</code>)
+              ) : (
+                <code>No tables referenced</code>
+              )}
+            </div>
+          </>
+        )}
+      </div>
       <SchemaPanel sql={sql} />
       <p>
-        FSBQ will not ask BigQuery to execute this query until you explicitly
-        approve it.
+        SQL Execution Gate will not submit a BigQuery query job until the dry
+        run passes and you explicitly approve this exact SQL.
       </p>
       <div className="approval-actions">
         <button
           className="secondary-button"
           disabled={disabled}
-          onClick={() => onDecision(message.id, "no")}
+          onClick={() => onDecision(message.id, "no", false)}
           type="button"
         >
           Reject
         </button>
         <button
           className="primary-button"
-          disabled={disabled}
-          onClick={() => onDecision(message.id, "yes")}
+          disabled={disabled || reviewState !== "ready"}
+          onClick={() =>
+            onDecision(message.id, "yes", Boolean(message.visualizeAfterApproval))
+          }
           type="button"
         >
           Approve &amp; execute
@@ -428,15 +583,47 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [requestStage, setRequestStage] = useState<RequestStage>("idle");
+  const [outputMode, setOutputMode] = useState<OutputMode>("analysis");
+  const [modeManuallySelected, setModeManuallySelected] = useState(false);
   const [backendState, setBackendState] = useState<
     "checking" | "ready" | "unavailable"
   >("checking");
   const transcriptRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const pendingApproval = useMemo(
     () => messages.some((message) => message.approvalStatus === "pending"),
     [messages],
   );
+
+  const followUpQuestions = useMemo(() => {
+    if (isLoading || pendingApproval) return [];
+
+    const latestMessage = messages.at(-1);
+    const latestApproval = [...messages].reverse().find(
+      (message) => message.approvalStatus !== undefined,
+    );
+    if (
+      latestApproval?.approvalStatus !== "approved" ||
+      latestMessage?.role !== "assistant" ||
+      !latestMessage.content ||
+      SQL_BLOCK.test(latestMessage.content) ||
+      /could not be completed|request failed|could not be created/i.test(
+        latestMessage.content,
+      )
+    ) {
+      return [];
+    }
+
+    const latestBusinessQuestion = [...messages].reverse().find(
+      (message) =>
+        message.role === "user" &&
+        !/^(yes|no)$/i.test(message.content.trim()),
+    );
+    return suggestFollowUpQuestions(
+      `${latestBusinessQuestion?.content ?? ""} ${latestMessage.content}`,
+    );
+  }, [isLoading, messages, pendingApproval]);
 
   useEffect(() => {
     fetch("/api/docs", { method: "GET" })
@@ -493,9 +680,12 @@ export default function App() {
     return created;
   }
 
-  async function sendMessage(text: string): Promise<void> {
+  async function sendMessage(
+    text: string,
+    visualizeAfterApproval = false,
+  ): Promise<{ content: string; succeeded: boolean }> {
     const cleanText = text.trim();
-    if (!cleanText || isLoading) return;
+    if (!cleanText || isLoading) return { content: "", succeeded: false };
 
     setInput("");
     setIsLoading(true);
@@ -506,6 +696,7 @@ export default function App() {
       content: cleanText,
     };
     const assistantId = makeId("assistant");
+    let assistantContent = "";
     setMessages((current) => [
       ...current,
       userMessage,
@@ -556,6 +747,7 @@ export default function App() {
           current.map((message) => {
             if (message.id !== assistantId) return message;
             const content = mergeEventText(message.content, eventText);
+            assistantContent = content;
             const images = [...(message.images ?? [])];
             for (const image of eventImages) {
               if (
@@ -577,6 +769,10 @@ export default function App() {
                 /\b(no|reject|cancel)\b/i.test(content)
                   ? "pending"
                   : message.approvalStatus,
+              visualizeAfterApproval:
+                SQL_BLOCK.test(content) && visualizeAfterApproval
+                  ? true
+                  : message.visualizeAfterApproval,
             };
           }),
         );
@@ -622,6 +818,15 @@ export default function App() {
             });
         }
       });
+      const safeContent = assistantContent.replace(VEGA_LITE_BLOCK, "").trim();
+      assistantContent = safeContent;
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? { ...message, content: safeContent, images: [] }
+            : message,
+        ),
+      );
     } catch (error) {
       const detail =
         error instanceof Error ? error.message : "Unexpected request failure.";
@@ -635,10 +840,12 @@ export default function App() {
             : message,
         ),
       );
+      return { content: detail, succeeded: false };
     } finally {
       setIsLoading(false);
       setRequestStage("idle");
     }
+    return { content: assistantContent, succeeded: Boolean(assistantContent) };
   }
 
   async function plotLatestResult(): Promise<void> {
@@ -698,12 +905,16 @@ export default function App() {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
-    void sendMessage(input);
+    const visualizeAfterApproval = outputMode === "visualize";
+    setOutputMode("analysis");
+    setModeManuallySelected(false);
+    void sendMessage(input, visualizeAfterApproval);
   }
 
   function handleApproval(
     messageId: string,
     decision: "yes" | "no",
+    visualizeAfterApproval: boolean,
   ): void {
     setMessages((current) =>
       current.map((message) =>
@@ -715,17 +926,29 @@ export default function App() {
           : message,
       ),
     );
-    void sendMessage(decision);
+    void (async () => {
+      const outcome = await sendMessage(decision);
+      if (
+        decision === "yes" &&
+        visualizeAfterApproval &&
+        outcome.succeeded &&
+        /\b(result|rows?|total|average|count|sales|revenue|data)\b/i.test(
+          outcome.content,
+        )
+      ) {
+        await plotLatestResult();
+      }
+    })();
   }
 
   return (
     <div className="app-shell">
       <header className="topbar">
-        <a className="brand" href="/app/" aria-label="FSBQ home">
-          <span className="brand-mark">F</span>
+        <a className="brand" href="/app/" aria-label="SQL Execution Gate home">
+          <span className="brand-mark">SQL</span>
           <span>
-            <strong>FSBQ Agent</strong>
-            <small>Safety-gated BigQuery assistant</small>
+            <strong>SQL Execution Gate</strong>
+            <small>Human approval before agent-generated SQL runs</small>
           </span>
         </a>
         <div className="status-group">
@@ -744,10 +967,10 @@ export default function App() {
       <main className="workspace">
         <section className="hero">
           <span className="eyebrow">Plan → review → execute</span>
-          <h1>Ask your data. Approve the query.</h1>
+          <h1>SQL Execution Gate</h1>
           <p>
-            FSBQ turns a business question into BigQuery SQL, shows the exact
-            query for review, and waits for your decision before execution.
+            Turn a business question into schema-grounded SQL, inspect its
+            tables and estimated cost, then approve or reject execution.
           </p>
           <div className="trust-row">
             <span>Live schema grounding</span>
@@ -764,24 +987,37 @@ export default function App() {
                 <h2>Explore TheLook ecommerce data</h2>
                 <div className="example-grid">
                   {[
-                    "Which 10 products generated the most revenue?",
-                    "Show monthly revenue for the last 12 months in the data",
-                    "Which customer countries have the highest order value?",
+                    {
+                      question: "Which 10 products generated the most revenue?",
+                      label: "Join + aggregation",
+                    },
+                    {
+                      question: "Show monthly revenue and order count over the dataset’s latest 12 months.",
+                      label: "Time-series analysis",
+                    },
+                    {
+                      question: "Compare completed and cancelled orders by product category.",
+                      label: "Multi-table comparison",
+                    },
                   ].map((example) => (
                     <button
                       disabled={backendState !== "ready"}
-                      key={example}
-                      onClick={() => void sendMessage(example)}
+                      key={example.question}
+                      onClick={() => void sendMessage(example.question)}
                       type="button"
                     >
-                      {example}
-                      <span>↗</span>
+                      <span className="example-copy">
+                        <strong>{example.question}</strong>
+                        <small>{example.label}</small>
+                      </span>
+                      <span aria-hidden="true">↗</span>
                     </button>
                   ))}
                 </div>
               </div>
             ) : (
-              messages.map((message) => {
+              <>
+              {messages.map((message) => {
                 const charts = extractVegaLiteSpecs(message.content);
                 return (
                   <article
@@ -791,7 +1027,7 @@ export default function App() {
                   <div className="message-meta">
                     {message.role === "user"
                       ? "You"
-                      : message.agent?.replace(/_/g, " ") || "FSBQ"}
+                      : message.agent?.replace(/_/g, " ") || "SQL Execution Gate"}
                   </div>
                   {message.content ? (
                     <div className="markdown">
@@ -868,7 +1104,34 @@ export default function App() {
                   )}
                   </article>
                 );
-              })
+              })}
+              {followUpQuestions.length > 0 && (
+                <section className="follow-up-panel" aria-label="Suggested next questions">
+                  <span className="eyebrow">Continue exploring</span>
+                  <h3>What would you like to investigate next?</h3>
+                  <div className="follow-up-list">
+                    {followUpQuestions.map((question) => (
+                      <button
+                        disabled={backendState !== "ready"}
+                        key={question}
+                        onClick={() => void sendMessage(question)}
+                        type="button"
+                      >
+                        <span>{question}</span>
+                        <span aria-hidden="true">↗</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="ask-another-button"
+                    onClick={() => composerRef.current?.focus()}
+                    type="button"
+                  >
+                    Ask another question
+                  </button>
+                </section>
+              )}
+              </>
             )}
           </div>
 
@@ -880,6 +1143,30 @@ export default function App() {
             </p>
           </div>
           <form className="composer" onSubmit={handleSubmit}>
+            <div className="output-mode" aria-label="Response mode" role="group">
+              <button
+                aria-pressed={outputMode === "analysis"}
+                disabled={isLoading || Boolean(pendingApproval)}
+                onClick={() => {
+                  setOutputMode("analysis");
+                  setModeManuallySelected(true);
+                }}
+                type="button"
+              >
+                Analyze
+              </button>
+              <button
+                aria-pressed={outputMode === "visualize"}
+                disabled={isLoading || Boolean(pendingApproval)}
+                onClick={() => {
+                  setOutputMode("visualize");
+                  setModeManuallySelected(true);
+                }}
+                type="button"
+              >
+                Analyze + chart
+              </button>
+            </div>
             <textarea
               aria-label="Ask a data question"
               disabled={
@@ -887,7 +1174,17 @@ export default function App() {
                 pendingApproval ||
                 backendState !== "ready"
               }
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) => {
+                const nextInput = event.target.value;
+                setInput(nextInput);
+                if (!modeManuallySelected) {
+                  setOutputMode(
+                    explicitlyRequestsVisualization(nextInput)
+                      ? "visualize"
+                      : "analysis",
+                  );
+                }
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
@@ -899,6 +1196,7 @@ export default function App() {
                   ? "Approve or reject the SQL above to continue"
                   : "Ask a question about the dataset…"
               }
+              ref={composerRef}
               rows={2}
               value={input}
             />

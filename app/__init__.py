@@ -1,4 +1,4 @@
-"""FSBQ ADK application package.
+"""SQL Execution Gate ADK application package.
 
 Keep agent construction lazy so importing utility modules does not require the
 full production environment. ADK still discovers ``root_agent`` through the

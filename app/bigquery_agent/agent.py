@@ -42,7 +42,6 @@ from .sub_agents.bigquery.agent import sql_plan_generator, sql_executor
 from .sub_agents.bigquery.tools import (
     get_database_settings as get_bq_database_settings
 )
-from .tools import call_advanced_analytics_agent, call_analytics_agent
 
 
 # Configure Weave endpoint and authentication
@@ -212,7 +211,6 @@ bq_root_agent = LlmAgent(
     name="bq_root_agent",
     instruction=get_instruction_with_schema,  # ✅ Dynamic function reference
     sub_agents=sub_agents,
-    tools=[call_analytics_agent, call_advanced_analytics_agent],
     before_agent_callback=load_database_settings_in_context,
     generate_content_config=types.GenerateContentConfig(
         temperature=0.01,

@@ -16,7 +16,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
     PYTHONPATH=/workspace/agents \
-    FSBQ_AGENTS_DIR=/workspace/agents
+    SQL_EXECUTION_GATE_AGENTS_DIR=/workspace/agents
 WORKDIR /workspace
 COPY --from=ghcr.io/astral-sh/uv:0.11.29 /uv /uvx /bin/
 COPY pyproject.toml uv.lock README.md ./

@@ -493,4 +493,4 @@ interactive_planner_agent = LlmAgent(
 )
 
 root_agent = interactive_planner_agent
-app = App(root_agent=root_agent, name="fsbq_app")
+app = App(root_agent=root_agent, name="sql_execution_gate_app")

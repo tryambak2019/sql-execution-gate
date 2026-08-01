@@ -1,7 +1,7 @@
 [project]
-name = "fsbq-agent"
+name = "sql-execution-gate"
 version = "0.1.0"
-description = "A safety-gated BigQuery assistant with separate SQL planning and execution stages"
+description = "Human approval and deterministic policy checks before agent-generated SQL runs"
 license = {text = "Apache License 2.0"}
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -40,7 +40,6 @@ dev = [
     "pytest>=9.0.1",
     "pytest-asyncio>=1.3.0",
     "nest-asyncio>=1.6.0",
-    "agent-starter-pack>=0.14.1",
     "jupyter>=1.1.1",
     "ruff>=0.4.6",
     "mypy>=1.19.0",
@@ -80,15 +79,6 @@ packages = ["app"]
 [tool.pytest.ini_options]
 pythonpath = "."
 asyncio_default_fixture_loop_scope = "function"
-
-[tool.agent-starter-pack]
-base_template = "adk_base"
-description = "A BigQuery assistant that presents generated SQL for explicit human approval before execution"
-example_question = "Which 10 products generated the most revenue?"
-
-[tool.agent-starter-pack.settings]
-deployment_targets = ["agent_engine", "cloud_run"]
-interactive_command = "dev"
 
 [build-system]
 requires = ["hatchling"]
