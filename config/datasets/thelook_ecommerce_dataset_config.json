@@ -1,0 +1,9 @@
+{
+  "datasets": [
+    {
+      "type": "bigquery",
+      "name": "thelook_ecommerce",
+      "description": "Synthetic ecommerce dataset containing customers, orders, order items, products, inventory, and distribution-center data."
+    }
+  ]
+}

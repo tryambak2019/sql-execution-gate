@@ -1,0 +1,62 @@
+name: Build and Safety Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    name: Frontend, API, and Container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Sync locked Python dependencies
+        run: uv sync --frozen
+
+      - name: Test production web surface
+        run: uv run pytest tests/unit -v
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Lint frontend
+        run: npm --prefix frontend run lint
+
+      - name: Build frontend
+        run: npm --prefix frontend run build
+
+      - name: Build production container
+        run: docker build --target runtime --tag fsbq-agent:test .
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.12.2"
+
+      - name: Validate Terraform bootstrap script
+        run: bash -n deployment/terraform/cloudrun/bootstrap.sh
+
+      - name: Validate Terraform configuration
+        run: |
+          terraform -chdir=deployment/terraform/cloudrun fmt -check -recursive
+          terraform -chdir=deployment/terraform/cloudrun init -backend=false
+          terraform -chdir=deployment/terraform/cloudrun validate

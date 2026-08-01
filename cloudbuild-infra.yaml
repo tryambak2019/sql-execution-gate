@@ -1,0 +1,81 @@
+substitutions:
+  _TF_VERSION: "1.12.2"
+  _TF_ROOT: deployment/terraform/cloudrun
+  _STATE_BUCKET: gcplab20250706-fsbq-tf-state
+  _STATE_PREFIX: fsbq/cloudrun
+  _REGION: us-central1
+  _REPOSITORY: bigquery-bot-repo
+  _DATA_PROJECT_ID: bigquery-public-data
+  _DATASET_ID: thelook_ecommerce
+  _CREATE_ARTIFACT_REPOSITORY: "false"
+  _MIN_INSTANCES: "1"
+  _CLOUD_BUILD_REPOSITORY: ""
+
+steps:
+  - id: terraform-fmt
+    name: hashicorp/terraform:${_TF_VERSION}
+    entrypoint: sh
+    args:
+      - -ceu
+      - terraform -chdir="${_TF_ROOT}" fmt -check -recursive
+
+  - id: terraform-init
+    name: hashicorp/terraform:${_TF_VERSION}
+    entrypoint: sh
+    args:
+      - -ceu
+      - |
+        terraform -chdir="${_TF_ROOT}" init \
+          -input=false \
+          -backend-config="bucket=${_STATE_BUCKET}" \
+          -backend-config="prefix=${_STATE_PREFIX}"
+
+  - id: terraform-validate
+    name: hashicorp/terraform:${_TF_VERSION}
+    entrypoint: sh
+    args:
+      - -ceu
+      - terraform -chdir="${_TF_ROOT}" validate
+
+  - id: terraform-plan
+    name: hashicorp/terraform:${_TF_VERSION}
+    entrypoint: sh
+    env:
+      - TF_IN_AUTOMATION=true
+      - TF_INPUT=false
+      - TF_VAR_project_id=$PROJECT_ID
+      - TF_VAR_region=${_REGION}
+      - TF_VAR_artifact_repository_id=${_REPOSITORY}
+      - TF_VAR_data_project_id=${_DATA_PROJECT_ID}
+      - TF_VAR_dataset_id=${_DATASET_ID}
+      - TF_VAR_create_artifact_repository=${_CREATE_ARTIFACT_REPOSITORY}
+      - TF_VAR_min_instances=${_MIN_INSTANCES}
+      - TF_VAR_cloud_build_repository=${_CLOUD_BUILD_REPOSITORY}
+    args:
+      - -ceu
+      - |
+        NOTIFICATION_RATE_LIMIT_SECONDS="$(sed -n 's/^NOTIFICATION_RATE_LIMIT_SECONDS = \([0-9][0-9]*\)$/\1/p' app/config.py)"
+        test -n "$$NOTIFICATION_RATE_LIMIT_SECONDS"
+        export TF_VAR_notification_rate_limit_seconds="$$NOTIFICATION_RATE_LIMIT_SECONDS"
+        terraform -chdir="${_TF_ROOT}" plan \
+          -input=false \
+          -lock-timeout=5m \
+          -out=/workspace/tfplan
+
+  - id: terraform-apply
+    name: hashicorp/terraform:${_TF_VERSION}
+    entrypoint: sh
+    env:
+      - TF_IN_AUTOMATION=true
+      - TF_INPUT=false
+    args:
+      - -ceu
+      - |
+        terraform -chdir="${_TF_ROOT}" apply \
+          -input=false \
+          -lock-timeout=5m \
+          -auto-approve \
+          /workspace/tfplan
+
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,16 @@
+project_id = "gcplab20250706"
+region     = "us-central1"
+
+# Run jobs in project_id while reading the public TheLook dataset.
+data_project_id = "bigquery-public-data"
+dataset_id      = "thelook_ecommerce"
+
+# Reuse the repository already used by bqbot.
+artifact_repository_id     = "bigquery-bot-repo"
+create_artifact_repository = false
+
+# Google sends a one-time verification message before alerts are delivered.
+engagement_alert_email = "dev.ocicloud26@yahoo.com"
+
+# Optional: add this after connecting fsbq-agent in Cloud Build repositories.
+# cloud_build_repository = "projects/gcplab20250706/locations/us-central1/connections/CONNECTION/repositories/fsbq-agent"
