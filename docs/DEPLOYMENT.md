@@ -22,8 +22,7 @@ export SQL_GATE_DATA_PROJECT="bigquery-public-data"
 export SQL_GATE_DATASET="thelook_ecommerce"
 export SQL_GATE_REPOSITORY="sql-execution-gate-images"
 
-# Existing deployments may retain this internal service identifier.
-export SQL_GATE_SERVICE="fsbq-agent"
+export SQL_GATE_SERVICE="sql-execution-gate"
 gcloud config set project "$SQL_GATE_PROJECT"
 ```
 
@@ -48,13 +47,12 @@ Review and run the one-time bootstrap from an owner or administrator account:
 ```
 
 The script creates the versioned state bucket and dedicated Terraform identity
-outside the main stack. Keep their existing identifiers when updating an
-already deployed environment.
+outside the main stack.
 
 ```bash
-export SQL_GATE_TERRAFORM_SA="fsbq-terraform@$SQL_GATE_PROJECT.iam.gserviceaccount.com"
-export SQL_GATE_BUILD_SA="fsbq-agent-build@$SQL_GATE_PROJECT.iam.gserviceaccount.com"
-export SQL_GATE_STATE_BUCKET="$SQL_GATE_PROJECT-fsbq-tf-state"
+export SQL_GATE_TERRAFORM_SA="sql-execution-gate-terraform@$SQL_GATE_PROJECT.iam.gserviceaccount.com"
+export SQL_GATE_BUILD_SA="sql-execution-gate-build@$SQL_GATE_PROJECT.iam.gserviceaccount.com"
+export SQL_GATE_STATE_BUCKET="$SQL_GATE_PROJECT-sql-execution-gate-tf-state"
 ```
 
 ## Apply infrastructure

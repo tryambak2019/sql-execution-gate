@@ -20,14 +20,13 @@ Apply through the locked remote backend:
 gcloud builds submit \
   --project=gcplab20250706 \
   --region=us-central1 \
-  --service-account=projects/gcplab20250706/serviceAccounts/fsbq-terraform@gcplab20250706.iam.gserviceaccount.com \
+  --service-account=projects/gcplab20250706/serviceAccounts/sql-execution-gate-terraform@gcplab20250706.iam.gserviceaccount.com \
   --config=cloudbuild-infra.yaml .
 ```
 
 The defaults bill query jobs to `gcplab20250706`, read
 `bigquery-public-data.thelook_ecommerce`, enforce a 1 GB per-query ceiling, and
-keep BQML disabled. Existing service-account, state-bucket, and Cloud Run names
-are intentionally retained to avoid Terraform state migration.
+keep BQML disabled.
 
 Deploy the tested application image with `cloudbuild.yaml`. See
 [docs/DEPLOYMENT.md](../../../docs/DEPLOYMENT.md) for the complete flow.

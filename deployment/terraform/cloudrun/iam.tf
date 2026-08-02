@@ -29,6 +29,12 @@ resource "google_project_iam_member" "build" {
   member  = "serviceAccount:${google_service_account.build.email}"
 }
 
+resource "google_storage_bucket_iam_member" "build_reads_cloud_build_source" {
+  bucket = "${var.project_id}_cloudbuild"
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.build.email}"
+}
+
 resource "google_service_account_iam_member" "build_uses_runtime" {
   service_account_id = google_service_account.runtime.name
   role               = "roles/iam.serviceAccountUser"

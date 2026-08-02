@@ -12,7 +12,7 @@ variable "region" {
 variable "service_name" {
   description = "Cloud Run service name."
   type        = string
-  default     = "fsbq-agent"
+  default     = "sql-execution-gate"
 }
 
 variable "artifact_repository_id" {

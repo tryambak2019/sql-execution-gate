@@ -251,9 +251,13 @@ def test_explicit_write_request_is_blocked_before_agent_execution(
         },
     )
 
-    assert response.status_code == 200
-    assert "Blocked: SQL Execution Gate permits read-only queries only." in response.text
-    assert "No BigQuery query job was submitted." in response.text
+    assert response.status_code == 422
+    assert response.json() == {
+        "detail": (
+            "Blocked: SQL Execution Gate permits read-only queries only.\n\n"
+            "No BigQuery query job was submitted."
+        )
+    }
 
 
 def test_demo_visit_emits_structured_log(

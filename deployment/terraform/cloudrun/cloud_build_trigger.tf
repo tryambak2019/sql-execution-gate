@@ -3,7 +3,7 @@ resource "google_cloudbuild_trigger" "main" {
 
   project         = var.project_id
   location        = var.region
-  name            = "fsbq-agent-main"
+  name            = "sql-execution-gate-main"
   description     = "Build, test, and deploy SQL Execution Gate when main changes"
   filename        = "cloudbuild.yaml"
   service_account = google_service_account.build.id

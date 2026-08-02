@@ -3,8 +3,9 @@ set -euo pipefail
 
 readonly SQL_GATE_PROJECT_ID="${1:-gcplab20250706}"
 readonly SQL_GATE_REGION="${2:-us-central1}"
-readonly SQL_GATE_STATE_BUCKET="${3:-${SQL_GATE_PROJECT_ID}-fsbq-tf-state}"
-readonly SQL_GATE_TERRAFORM_ACCOUNT_ID="fsbq-terraform"
+readonly SQL_GATE_STATE_BUCKET="${3:-${SQL_GATE_PROJECT_ID}-sql-execution-gate-tf-state}"
+readonly SQL_GATE_CLOUD_BUILD_BUCKET="${SQL_GATE_PROJECT_ID}_cloudbuild"
+readonly SQL_GATE_TERRAFORM_ACCOUNT_ID="sql-execution-gate-terraform"
 readonly SQL_GATE_TERRAFORM_EMAIL="${SQL_GATE_TERRAFORM_ACCOUNT_ID}@${SQL_GATE_PROJECT_ID}.iam.gserviceaccount.com"
 readonly SQL_GATE_TERRAFORM_MEMBER="serviceAccount:${SQL_GATE_TERRAFORM_EMAIL}"
 
@@ -61,6 +62,11 @@ done
 gcloud storage buckets add-iam-policy-binding "gs://${SQL_GATE_STATE_BUCKET}" \
   --member="${SQL_GATE_TERRAFORM_MEMBER}" \
   --role="roles/storage.objectAdmin" \
+  --quiet >/dev/null
+
+gcloud storage buckets add-iam-policy-binding "gs://${SQL_GATE_CLOUD_BUILD_BUCKET}" \
+  --member="${SQL_GATE_TERRAFORM_MEMBER}" \
+  --role="roles/storage.objectViewer" \
   --quiet >/dev/null
 
 echo "Terraform bootstrap complete."

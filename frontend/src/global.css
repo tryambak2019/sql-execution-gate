@@ -99,7 +99,8 @@ textarea:disabled {
 }
 
 .status-pill,
-.connection {
+.connection,
+.github-link {
   border: 1px solid rgba(30, 54, 42, 0.14);
   border-radius: 999px;
   color: #526158;
@@ -107,10 +108,36 @@ textarea:disabled {
   padding: 7px 11px;
 }
 
-.connection {
+.connection,
+.github-link {
   align-items: center;
   display: flex;
   gap: 7px;
+}
+
+.github-link {
+  text-decoration: none;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.github-link:hover {
+  background: #183e2c;
+  border-color: #183e2c;
+  color: #e8ffcb;
+}
+
+.github-link:focus-visible {
+  outline: 2px solid #3a9b60;
+  outline-offset: 2px;
+}
+
+.github-link svg {
+  fill: currentColor;
+  height: 15px;
+  width: 15px;
 }
 
 .connection i {
@@ -859,6 +886,15 @@ textarea:disabled {
 
   .connection {
     margin-top: 4px;
+  }
+
+  .github-link {
+    margin-top: 4px;
+    padding-inline: 8px;
+  }
+
+  .github-link span {
+    display: none;
   }
 
   .chat-panel {

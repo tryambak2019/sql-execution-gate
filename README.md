@@ -7,7 +7,7 @@ SQL Execution Gate converts a business question into schema-grounded SQL, shows
 the exact query, referenced tables, and estimated scan cost, and requires
 explicit human approval before a mechanically read-only executor can run it.
 
-[Try the live demo](https://fsbq-agent-bqjiefengq-uc.a.run.app/app/)
+[Try the live demo](https://sql-execution-gate-bqjiefengq-uc.a.run.app/app/)
 
 ## The failure this prevents
 
@@ -125,8 +125,6 @@ The active deployment path is Cloud Run through `cloudbuild-infra.yaml` and
 tables can remain in `bigquery-public-data`.
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for reproducible deployment steps.
-The existing internal Cloud Run service and Terraform state identifiers retain
-their original names to avoid a state migration before review.
 
 ## Positioning
 

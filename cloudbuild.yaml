@@ -1,7 +1,7 @@
 substitutions:
   _REGION: us-central1
   _REPOSITORY: bigquery-bot-repo
-  _SERVICE: fsbq-agent
+  _SERVICE: sql-execution-gate
 
 steps:
   - id: frontend-checks

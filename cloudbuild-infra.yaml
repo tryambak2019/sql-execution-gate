@@ -1,8 +1,8 @@
 substitutions:
   _TF_VERSION: "1.12.2"
   _TF_ROOT: deployment/terraform/cloudrun
-  _STATE_BUCKET: gcplab20250706-fsbq-tf-state
-  _STATE_PREFIX: fsbq/cloudrun
+  _STATE_BUCKET: gcplab20250706-sql-execution-gate-tf-state
+  _STATE_PREFIX: sql-execution-gate/cloudrun
   _REGION: us-central1
   _REPOSITORY: bigquery-bot-repo
   _DATA_PROJECT_ID: bigquery-public-data

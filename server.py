@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import yaml
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
@@ -135,22 +135,14 @@ def create_app(
                 payload = None
             block_reason = write_intent_block_reason(_user_message_text(payload))
             if block_reason:
-                event = {
-                    "author": "sql_execution_gate",
-                    "content": {
-                        "parts": [
-                            {
-                                "text": (
-                                    f"Blocked: {block_reason}\n\n"
-                                    "No BigQuery query job was submitted."
-                                )
-                            }
-                        ]
+                return JSONResponse(
+                    {
+                        "detail": (
+                            f"Blocked: {block_reason}\n\n"
+                            "No BigQuery query job was submitted."
+                        )
                     },
-                }
-                return StreamingResponse(
-                    iter([f"data: {json.dumps(event)}\n\n"]),
-                    media_type="text/event-stream",
+                    status_code=422,
                 )
             if _is_counted_user_query(payload):
                 visitor = _client_ip(request)
