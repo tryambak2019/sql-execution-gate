@@ -83,7 +83,7 @@ variable "min_instances" {
 variable "engagement_alert_email" {
   description = "Email address notified when a tagged visitor submits a demo query. Empty disables the alert."
   type        = string
-  default     = "dev.ocicloud26@yahoo.com"
+  default     = ""
 }
 
 variable "notification_rate_limit_seconds" {

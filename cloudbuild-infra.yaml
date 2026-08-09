@@ -9,6 +9,7 @@ substitutions:
   _DATASET_ID: thelook_ecommerce
   _CREATE_ARTIFACT_REPOSITORY: "false"
   _MIN_INSTANCES: "1"
+  _ENGAGEMENT_ALERT_EMAIL: ""
   _CLOUD_BUILD_REPOSITORY: ""
 
 steps:
@@ -50,6 +51,7 @@ steps:
       - TF_VAR_dataset_id=${_DATASET_ID}
       - TF_VAR_create_artifact_repository=${_CREATE_ARTIFACT_REPOSITORY}
       - TF_VAR_min_instances=${_MIN_INSTANCES}
+      - TF_VAR_engagement_alert_email=${_ENGAGEMENT_ALERT_EMAIL}
       - TF_VAR_cloud_build_repository=${_CLOUD_BUILD_REPOSITORY}
     args:
       - -ceu
