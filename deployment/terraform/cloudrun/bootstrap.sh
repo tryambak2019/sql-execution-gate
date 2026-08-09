@@ -66,7 +66,7 @@ gcloud storage buckets add-iam-policy-binding "gs://${SQL_GATE_STATE_BUCKET}" \
 
 gcloud storage buckets add-iam-policy-binding "gs://${SQL_GATE_CLOUD_BUILD_BUCKET}" \
   --member="${SQL_GATE_TERRAFORM_MEMBER}" \
-  --role="roles/storage.objectViewer" \
+  --role="roles/storage.admin" \
   --quiet >/dev/null
 
 echo "Terraform bootstrap complete."
