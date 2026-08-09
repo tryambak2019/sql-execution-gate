@@ -969,15 +969,6 @@ export default function App() {
           </span>
         </a>
         <div className="status-group">
-          <span className="status-pill">Read-only SQL</span>
-          <span className={`connection ${backendState}`}>
-            <i />
-            {backendState === "checking"
-              ? "Connecting"
-              : backendState === "ready"
-                ? "Agent ready"
-                : "Backend unavailable"}
-          </span>
           <a
             className="github-link"
             href="https://github.com/tryambak2019/sql-execution-gate"
@@ -998,14 +989,10 @@ export default function App() {
           <span className="eyebrow">Plan → review → execute</span>
           <h1>SQL Execution Gate</h1>
           <p>
-            Turn a business question into schema-grounded SQL, inspect its
-            tables and estimated cost, then approve or reject execution.
+            Ask a question about a simulated ecommerce business. Review the
+            generated SQL, referenced tables, and estimated scan cost before
+            approving read-only execution.
           </p>
-          <div className="trust-row">
-            <span>Live schema grounding</span>
-            <span>Separate planner and executor</span>
-            <span>Fail-closed recovery</span>
-          </div>
         </section>
 
         <section className="chat-panel">
@@ -1013,7 +1000,11 @@ export default function App() {
             {messages.length === 0 ? (
               <div className="empty-state">
                 <span className="eyebrow">Try a question</span>
-                <h2>Explore TheLook ecommerce data</h2>
+                <h2>Explore a simulated ecommerce business</h2>
+                <p className="dataset-summary">
+                  Public synthetic data for customers, orders, products, and
+                  inventory.
+                </p>
                 <div className="example-grid">
                   {[
                     {
