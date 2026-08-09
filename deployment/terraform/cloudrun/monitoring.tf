@@ -26,6 +26,12 @@ resource "google_monitoring_alert_policy" "demo_engagement" {
         resource.labels.service_name="${var.service_name}"
         jsonPayload.event="demo_visit_started"
       EOT
+
+      label_extractors = {
+        client_ip    = "EXTRACT(jsonPayload.client_ip)"
+        request_path = "EXTRACT(jsonPayload.request_path)"
+        user_agent   = "EXTRACT(jsonPayload.user_agent)"
+      }
     }
   }
 
@@ -41,7 +47,13 @@ resource "google_monitoring_alert_policy" "demo_engagement" {
   ]
 
   documentation {
-    content = "The SQL Execution Gate demo page was requested. Inspect the associated structured Cloud Run log."
+    content = <<-EOT
+The SQL Execution Gate demo page was requested.
+
+Incident details include extracted log labels for the requester IP address, request path, and user agent.
+
+Inspect the associated structured Cloud Run log for the full event payload.
+EOT
   }
 
   depends_on = [google_project_service.required["logging.googleapis.com"]]
