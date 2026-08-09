@@ -66,13 +66,17 @@ gcloud builds submit \
   --region="$SQL_GATE_REGION" \
   --service-account="projects/$SQL_GATE_PROJECT/serviceAccounts/$SQL_GATE_TERRAFORM_SA" \
   --config=cloudbuild-infra.yaml \
-  --substitutions="_STATE_BUCKET=$SQL_GATE_STATE_BUCKET,_REGION=$SQL_GATE_REGION,_REPOSITORY=$SQL_GATE_REPOSITORY,_DATA_PROJECT_ID=$SQL_GATE_DATA_PROJECT,_DATASET_ID=$SQL_GATE_DATASET,_CREATE_ARTIFACT_REPOSITORY=true" \
+  --substitutions="_STATE_BUCKET=$SQL_GATE_STATE_BUCKET,_REGION=$SQL_GATE_REGION,_REPOSITORY=$SQL_GATE_REPOSITORY,_DATA_PROJECT_ID=$SQL_GATE_DATA_PROJECT,_DATASET_ID=$SQL_GATE_DATASET,_CREATE_ARTIFACT_REPOSITORY=true,_ENGAGEMENT_ALERT_EMAIL=$ENGAGEMENT_ALERT_EMAIL" \
   .
 ```
 
 The stack creates the Cloud Run service, runtime and build identities, required
 APIs and IAM, and optional repository and main-branch trigger. It keeps one
 instance because sessions currently use in-memory storage.
+
+If you deploy from GitHub Actions, store the alert recipient in the repository
+secret `ENGAGEMENT_ALERT_EMAIL` and forward it to the infra build as
+`_ENGAGEMENT_ALERT_EMAIL`.
 
 ## Build and deploy
 

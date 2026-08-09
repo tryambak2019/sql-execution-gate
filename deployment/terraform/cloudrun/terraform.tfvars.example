@@ -10,6 +10,9 @@ artifact_repository_id     = "bigquery-bot-repo"
 create_artifact_repository = false
 
 # Google sends a one-time verification message before alerts are delivered.
+# When deploying from GitHub Actions, set the repository secret
+# ENGAGEMENT_ALERT_EMAIL and pass it to cloudbuild-infra.yaml as
+# _ENGAGEMENT_ALERT_EMAIL.
 engagement_alert_email = "dev.ocicloud26@yahoo.com"
 
 # Optional: add this after connecting the repository in Cloud Build.

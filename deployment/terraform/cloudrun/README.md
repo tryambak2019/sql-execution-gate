@@ -21,12 +21,17 @@ gcloud builds submit \
   --project=gcplab20250706 \
   --region=us-central1 \
   --service-account=projects/gcplab20250706/serviceAccounts/sql-execution-gate-terraform@gcplab20250706.iam.gserviceaccount.com \
+  --substitutions=_ENGAGEMENT_ALERT_EMAIL=dev.ocicloud26@yahoo.com \
   --config=cloudbuild-infra.yaml .
 ```
 
 The defaults bill query jobs to `gcplab20250706`, read
 `bigquery-public-data.thelook_ecommerce`, enforce a 1 GB per-query ceiling, and
 keep BQML disabled.
+
+If you deploy from GitHub Actions, store the recipient in the repository secret
+`ENGAGEMENT_ALERT_EMAIL` and forward it to the infra build as
+`_ENGAGEMENT_ALERT_EMAIL`.
 
 Deploy the tested application image with `cloudbuild.yaml`. See
 [docs/DEPLOYMENT.md](../../../docs/DEPLOYMENT.md) for the complete flow.
