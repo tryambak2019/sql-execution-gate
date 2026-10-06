@@ -75,9 +75,9 @@ variable "max_instances" {
 }
 
 variable "min_instances" {
-  description = "Cloud Run minimum warm instances. Keep at one for latency-sensitive demos."
+  description = "Cloud Run minimum warm instances. Set to zero to avoid idle-instance charges."
   type        = number
-  default     = 1
+  default     = 0
 }
 
 variable "engagement_alert_email" {

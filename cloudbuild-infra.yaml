@@ -8,7 +8,7 @@ substitutions:
   _DATA_PROJECT_ID: bigquery-public-data
   _DATASET_ID: thelook_ecommerce
   _CREATE_ARTIFACT_REPOSITORY: "false"
-  _MIN_INSTANCES: "1"
+  _MIN_INSTANCES: "0"
   _ENGAGEMENT_ALERT_EMAIL: ""
   _CLOUD_BUILD_REPOSITORY: ""
 

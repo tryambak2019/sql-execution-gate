@@ -71,8 +71,10 @@ gcloud builds submit \
 ```
 
 The stack creates the Cloud Run service, runtime and build identities, required
-APIs and IAM, and optional repository and main-branch trigger. It keeps one
-instance because sessions currently use in-memory storage.
+APIs and IAM, and optional repository and main-branch trigger. It scales to
+zero instances when idle to avoid idle-instance charges; expect a cold start
+for the next request. Sessions remain in memory and are not preserved across
+instance termination.
 
 If you deploy from GitHub Actions, store the alert recipient in the repository
 secret `ENGAGEMENT_ALERT_EMAIL` and forward it to the infra build as
